@@ -1,0 +1,155 @@
+#!/bin/sh
+#
+# <daemonname> <summary>
+#
+# chkconfig:   - 20 80
+# description: <description, split multiple lines with \
+#              a backslash>
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+SELENIUM_DIR={{selenium_grid_server_install_path}}
+exec="$SELENIUM_DIR/{{selenium_grid_server_script}}"
+prog="selenium"
+
+[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+lockfile=/var/lock/subsys/$prog
+
+echo_running() {
+    [ "$BOOTUP" = "color" ] && $MOVE_TO_COL
+    echo -n "["
+    [ "$BOOTUP" = "color" ] && $SETCOLOR_SUCCESS
+    echo -n $"  RUNNING  "
+    [ "$BOOTUP" = "color" ] && $SETCOLOR_NORMAL
+    echo -n "]"
+    echo -ne "\r"
+    return 0
+}
+
+echo_stopped() {
+    [ "$BOOTUP" = "color" ] && $MOVE_TO_COL
+    echo -n "["
+    [ "$BOOTUP" = "color" ] && $SETCOLOR_FAILURE
+    echo -n $"  STOPPED  "
+    [ "$BOOTUP" = "color" ] && $SETCOLOR_NORMAL
+    echo -n "]"
+    echo -ne "\r"
+    return 0
+}
+
+running() {
+    [ "$BOOTUP" != "verbose" -a -z "${LSB:-}" ] && echo_running
+    return 0
+}
+
+stopped() {
+    local rc=$?
+    [ "$BOOTUP" != "verbose" -a -z "${LSB:-}" ] && echo_stopped
+    [ -x /bin/plymouth ] && /bin/plymouth --details
+    return $rc
+}
+
+
+pidjavaproc() {
+    pid=$(jps | grep $1 | awk '{print $1;}')
+}
+
+killjavaproc() {
+    pidjavaproc $1
+    if [ ! -z "$pid" ]; then
+    	kill -9 $pid
+	RC=$?
+	[ "$RC" -eq 0 ] && success || failure
+    	return $RC
+    fi
+    failure $"$1 is not running"
+    return 1
+}
+
+statusjavaproc() {
+    pidjavaproc $1
+    [ ! -z "$pid" ] && running || stopped
+}
+
+start() {
+    [ -x $exec ] || exit 5
+    echo -n $"Starting $prog: "
+    # if not running, start it up here, usually something like "daemon $exec"
+    daemon $exec
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+    return $retval
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    # stop it here, often "killproc $prog"
+    killjavaproc $prog
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+restart() {
+    stop
+    start
+}
+
+reload() {
+    restart
+}
+
+force_reload() {
+    restart
+}
+
+rh_status() {
+    # run checks to determine if the service is running or use generic status
+    echo -n $"Status $prog: "
+    statusjavaproc $prog
+    local rc=$?
+    echo
+    return $rc
+}
+
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+
+case "$1" in
+    start)
+        rh_status_q && exit 0
+        $1
+        ;;
+    stop)
+        rh_status_q || exit 0
+	$1
+        ;;
+    restart)
+        $1
+        ;;
+    reload)
+        rh_status_q || exit 7
+        $1
+        ;;
+    force-reload)
+        force_reload
+        ;;
+    status)
+        rh_status
+        ;;
+    condrestart|try-restart)
+        rh_status_q || exit 0
+        restart
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
+        exit 2
+esac
+exit $?

@@ -1,0 +1,6 @@
+#!/bin/bash
+JAVA_BIN={{java_binary}}
+SELENIUM_DIR={{selenium_grid_server_install_path}}
+JAR_FILE="$SELENIUM_DIR/{{selenium_grid_server_binary}}"
+LOG_FILE=/var/log/selenium
+$JAVA_BIN -jar $JAR_FILE -role hub -port 80 2> $LOG_FILE.log > $LOG_FILE-errors.log &

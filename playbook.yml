@@ -1,0 +1,42 @@
+---
+- hosts: all
+  sudo: true
+  vars:
+    java_binary: /usr/bin/java
+    java_rpm_path: "/opt/jdk-8u77-linux-x64.rpm"
+    selenium_grid_server_binary: "selenium-server-standalone-2.53.0.jar"
+    selenium_grid_server_script: "start-selenium.sh"
+    selenium_grid_server_install_path: "/etc/local"
+    selenium_grid_server_path: "{{selenium_grid_server_install_path}}/{{selenium_grid_server_binary}}"
+    selenium_grid_server_script_path: "{{selenium_grid_server_install_path}}/{{selenium_grid_server_script}}"
+    
+  tasks:
+    
+    - include: prerequisite.yml
+    
+    - name: "Check if java is installed"
+      stat: path="{{java_binary}}"
+      register: java_bin
+    
+    - include: java.yml
+      when: java_bin.stat.exists==false
+    
+    - name: "Create /etc/local"
+      file: path="{{selenium_grid_server_install_path}}" state=directory
+     
+    - name: "Install Selenium Grid Server"
+      get_url: url="http://selenium-release.storage.googleapis.com/2.53/selenium-server-standalone-2.53.0.jar" dest="{{selenium_grid_server_path}}" force=no
+    
+    - name: Add Selenium Grid Server startup script
+      template: src=templates/start-selenium.j2 dest="{{selenium_grid_server_install_path}}/{{selenium_grid_server_script}}" mode="a+x"
+      
+    - name: Add Selenium Grid Server init.d daemon script
+      template: src=templates/init.d-selenium.j2 dest="/etc/init.d/selenium" mode=0751
+    
+    - name: Enable Selenium Grid Server at boot
+      service: name=selenium enabled=yes
+      
+    - name: Ensure Selenium Grid Server is started
+      service: name=selenium state=started
+    
+    
